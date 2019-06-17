@@ -1,0 +1,29 @@
+name:                ighci
+version:             0.1.0.0
+homepage:            https://github.com/ddrone/iGHCi
+license:             MIT
+author:              Andrew Shulaev
+maintainer:          ash.drone@gmail.com
+copyright:           2019 Andrew Shulaev
+category:            Tools
+
+dependencies:
+  - base >= 4.7 && < 5
+  - containers
+  - directory
+  - hinotify
+  - process
+  - text
+
+default-extensions:
+  - LambdaCase
+  - OverloadedStrings
+
+ghc-options:
+  - -fwarn-incomplete-patterns
+  - -fmax-relevant-binds=10
+
+executables:
+  ighci:
+    source-dirs: src
+    main: Main.hs
