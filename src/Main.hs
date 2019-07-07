@@ -39,13 +39,15 @@ untilM body = loop
 main :: IO ()
 main = do
   env <- initEnvironment
-  ghciWrapper env
+  (writerID, readerID) <- ghciWrapper env
   untilM $ do
     Text.putStr "> "
     hFlush stdout
     line <- Text.getLine
     let command = parseCommand line
     handleCommand env command
+  killThread writerID
+  killThread readerID
 
 ghciProcess :: Environment -> CreateProcess
 ghciProcess env =
@@ -95,14 +97,13 @@ ghciInteract env input = do
   writeChan (inChannel env) input
   readChan (outChannel env)
 
-ghciWrapper :: Environment -> IO ()
+ghciWrapper :: Environment -> IO (ThreadId, ThreadId)
 ghciWrapper env = do
   (Just hIn, Just hOut, _, _) <- createProcess (ghciProcess env)
-  forkIO (ghciWriter env hIn)
-  forkIO (ghciReader env hOut)
-  -- TODO: return thread IDs and process handle for graceful shutdown
+  writerID <- forkIO (ghciWriter env hIn)
+  readerID <- forkIO (ghciReader env hOut)
   ghciInteract env (Text.concat [":set prompt \"", prompt env, "\""])
-  pure ()
+  pure (writerID, readerID)
 
 data Command
   = LoadFile Text
