@@ -23,11 +23,24 @@ betterBreak needle haystack =
   then Just (r1, Text.drop (Text.length needle) r2)
   else Nothing
 
+data Loop
+  = Continue
+  | Halt
+
+untilM :: Monad m => m Loop -> m ()
+untilM body = loop
+  where
+    loop = do
+      result <- body
+      case result of
+        Continue -> loop
+        Halt -> pure ()
+
 main :: IO ()
 main = do
   env <- initEnvironment
   ghciWrapper env
-  forever $ do
+  untilM $ do
     Text.putStr "> "
     hFlush stdout
     line <- Text.getLine
@@ -96,6 +109,7 @@ data Command
   | BadCommand Text
   | Ghci Text
   | Clear
+  | Quit
   deriving (Show)
 
 singleCommand :: Text -> (Text -> a) -> Text -> Maybe a
@@ -122,6 +136,7 @@ parseCommand =
   parseCond Ghci
     [ (":load ", LoadFile . Text.strip)
     , (":clear", const Clear)
+    , (":quit", const Quit)
     , (":", BadCommand)
     ]
 
@@ -137,7 +152,7 @@ performReload env = do
   putStr "> "
   hFlush stdout
 
-handleCommand :: Environment -> Command -> IO ()
+handleCommand :: Environment -> Command -> IO Loop
 handleCommand env = \case
   LoadFile src -> do
     isFile <- doesFileExist (Text.unpack src)
@@ -148,22 +163,24 @@ handleCommand env = \case
         addWatch (iNotify env) [Close] (encodeUtf8 src) $ \event -> do
           if wasWriteable event
             then performReload env
-            else return ()
-        pure ()
+            else pure ()
+        pure Continue
       else do
         Text.putStrLn ("File does not exist: " <> src)
-        pure ()
+        pure Continue
   BadCommand cmd -> do
     putStrLn "Passing colon commands to GHCi is not supported."
-    pure ()
+    pure Continue
   Ghci text -> do
     Text.putStr =<< ghciInteract env text
     if Text.null text
-      then pure ()
+      then pure Continue
       else do
         modifyIORef (replHistory env) (|> text)
-        pure ()
+        pure Continue
   Clear -> do
     writeIORef (replHistory env) Seq.empty
-    pure ()
+    pure Continue
+  Quit -> do
+    pure Halt
 
