@@ -27,15 +27,12 @@ main :: IO ()
 main = do
   env <- initEnvironment
   ghciWrapper env
-  loop env
-  where
-    loop e = do
-      Text.putStr "> "
-      hFlush stdout
-      line <- Text.getLine
-      let command = parseCommand line
-      newEnv <- handleCommand e command
-      loop newEnv
+  forever $ do
+    Text.putStr "> "
+    hFlush stdout
+    line <- Text.getLine
+    let command = parseCommand line
+    handleCommand env command
 
 ghciProcess :: Environment -> CreateProcess
 ghciProcess env =
@@ -140,7 +137,7 @@ performReload env = do
   putStr "> "
   hFlush stdout
 
-handleCommand :: Environment -> Command -> IO Environment
+handleCommand :: Environment -> Command -> IO ()
 handleCommand env = \case
   LoadFile src -> do
     isFile <- doesFileExist (Text.unpack src)
@@ -152,21 +149,21 @@ handleCommand env = \case
           if wasWriteable event
             then performReload env
             else return ()
-        pure env
+        pure ()
       else do
         Text.putStrLn ("File does not exist: " <> src)
-        pure env
+        pure ()
   BadCommand cmd -> do
     putStrLn "Passing colon commands to GHCi is not supported."
-    pure env
+    pure ()
   Ghci text -> do
     Text.putStr =<< ghciInteract env text
     if Text.null text
-      then pure env
+      then pure ()
       else do
         modifyIORef (replHistory env) (|> text)
-        pure env
+        pure ()
   Clear -> do
     writeIORef (replHistory env) Seq.empty
-    pure env
+    pure ()
 
