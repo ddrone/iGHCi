@@ -129,7 +129,7 @@ performReload :: Environment -> IO ()
 performReload env = do
   putStr "\x1b[H\x1b[J"
   putStrLn "Files updated, reloading"
-  ghciInteract env ":reload"
+  Text.putStrLn =<< ghciInteract env ":reload"
   let runCommand cmd = do
         Text.putStrLn ("> " <> cmd)
         Text.putStrLn =<< ghciInteract env cmd
