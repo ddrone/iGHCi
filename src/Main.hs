@@ -10,6 +10,7 @@ import System.Directory
 import System.Process
 import System.IO
 import System.INotify
+import System.FilePath
 import Data.IORef
 
 import qualified Data.Text as Text
@@ -36,9 +37,20 @@ untilM body = loop
         Continue -> loop
         Halt -> pure ()
 
+guessCommand :: IO String
+guessCommand = do
+  wd <- getCurrentDirectory
+  isStack <- doesFileExist (wd </> "stack.yaml")
+  -- TODO Support Cabal
+  if isStack
+    then pure "stack repl"
+    else pure "ghci"
+
 main :: IO ()
 main = do
-  env <- initEnvironment
+  cmd <- guessCommand
+  putStrLn $ concat ["Using \"", cmd, "\" as REPL command"]
+  env <- initEnvironment cmd
   (writerID, readerID) <- ghciWrapper env
   untilM $ do
     Text.putStr "> "
@@ -83,14 +95,14 @@ ghciReader env hOut = loop ""
         writeChan (outChannel env) first
         loop rest
 
-initEnvironment :: IO Environment
-initEnvironment = do
+initEnvironment :: String -> IO Environment
+initEnvironment cmd = do
   iNotify <- initINotify
   ch1 <- newChan
   ch2 <- newChan
   history <- newIORef Seq.empty
   -- TODO: generate random prompt instead of using a fixed string
-  pure (Environment ch1 ch2 "secret-prompt>" "ghci" history iNotify)
+  pure (Environment ch1 ch2 "secret-prompt>" cmd history iNotify)
 
 ghciInteract :: Environment -> Text -> IO Text
 ghciInteract env input = do
